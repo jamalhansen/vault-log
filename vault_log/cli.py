@@ -1,6 +1,7 @@
 import argparse
 import sys
 from datetime import datetime, timedelta
+
 from vault_log.db import (
     resolve_db_path,
     init_db,
@@ -8,9 +9,26 @@ from vault_log.db import (
     read_entries,
     search_entries,
     expire_entries,
-    delete_entry,
-    update_entry,
+    archive_entry,
+    list_archived,
 )
+
+
+def _parse_expires(value: str) -> str:
+    """Parse an ISO date or +Nd shorthand. Raises ValueError on bad input."""
+    if value.startswith("+") and value.endswith("d"):
+        try:
+            days = int(value[1:-1])
+        except ValueError:
+            raise ValueError(f"Invalid relative date '{value}'. Use +14d format.")
+        return (datetime.now() + timedelta(days=days)).date().isoformat()
+    # Validate it looks like an ISO date
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"Invalid date '{value}'. Use YYYY-MM-DD or +14d format.")
+    return value
+
 
 def main():
     parser = argparse.ArgumentParser(description="SQLite-backed session log for Obsidian vaults")
@@ -20,7 +38,7 @@ def main():
     add_parser = subparsers.add_parser("add")
     add_parser.add_argument("--vault", "-w", required=True)
     add_parser.add_argument("--type", "-t", required=True, choices=["context", "session", "decision"])
-    add_parser.add_argument("--expires", "-e", help="ISO date (YYYY-MM-DD)")
+    add_parser.add_argument("--expires", "-e", help="ISO date (YYYY-MM-DD) or relative (+14d)")
     add_parser.add_argument("-v", "--verbose", action="store_true")
     add_parser.add_argument("text")
 
@@ -38,18 +56,14 @@ def main():
     expire_parser = subparsers.add_parser("expire")
     expire_parser.add_argument("-v", "--verbose", action="store_true")
 
-    # vlog delete
-    delete_parser = subparsers.add_parser("delete")
-    delete_parser.add_argument("--id", "-i", type=int, required=True)
-    delete_parser.add_argument("-v", "--verbose", action="store_true")
+    # vlog archive
+    archive_parser = subparsers.add_parser("archive")
+    archive_parser.add_argument("--id", "-i", type=int, required=True)
 
-    # vlog update
-    update_parser = subparsers.add_parser("update")
-    update_parser.add_argument("--id", "-i", type=int, required=True)
-    update_parser.add_argument("--text", "-x")
-    update_parser.add_argument("--expires", "-e")
-    update_parser.add_argument("--type", "-t", choices=["context", "session", "decision"])
-    update_parser.add_argument("-v", "--verbose", action="store_true")
+    # vlog archived
+    archived_parser = subparsers.add_parser("archived")
+    archived_parser.add_argument("--vault", "-w", required=True)
+    archived_parser.add_argument("--type", "-t", choices=["context", "session", "decision"])
 
     args = parser.parse_args()
     db_path = resolve_db_path()
@@ -57,12 +71,18 @@ def main():
 
     if args.command == "add":
         if args.type == "session" and not args.expires:
-            print("Warning: session entry without expiry. Consider adding -e YYYY-MM-DD (e.g. +14d).", file=sys.stderr)
-        
-        expires = args.expires
-        if expires and expires.startswith("+") and expires.endswith("d"):
-            days = int(expires[1:-1])
-            expires = (datetime.now() + timedelta(days=days)).date().isoformat()
+            print(
+                "Warning: session entry without expiry. Consider adding -e YYYY-MM-DD or -e +14d.",
+                file=sys.stderr,
+            )
+
+        expires = None
+        if args.expires:
+            try:
+                expires = _parse_expires(args.expires)
+            except ValueError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
 
         row_id = add_entry(db_path, args.vault, args.type, args.text, expires)
         print(f"Added [{args.type}] to {args.vault} (id={row_id})")
@@ -84,43 +104,30 @@ def main():
                 print(f"[{res['vault']} / {res['type']}] {res['text']}")
 
     elif args.command == "expire":
-        # Verbose mode needs to fetch before deleting
-        if args.verbose:
-            import sqlite3
-            with sqlite3.connect(db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                expired = conn.execute("SELECT * FROM entries WHERE expires < date('now')").fetchall()
-                for entry in expired:
-                    print(f"Expiring: [{entry['vault']} / {entry['type']}] {entry['text']}")
-        
-        count = expire_entries(db_path)
-        if count > 0:
-            print(f"Expired {count} entries.")
-        else:
+        expired = expire_entries(db_path)
+        if not expired:
             print("Nothing to expire.")
-
-    elif args.command == "delete":
-        if args.verbose:
-            import sqlite3
-            with sqlite3.connect(db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                entry = conn.execute("SELECT * FROM entries WHERE id = ?", (args.id,)).fetchone()
-                if entry:
-                    print(f"Deleting: [{entry['vault']} / {entry['type']}] {entry['text']}")
-
-        if delete_entry(db_path, args.id):
-            print(f"Deleted entry {args.id}.")
         else:
-            print(f"No entry with id {args.id}.")
+            if args.verbose:
+                for entry in expired:
+                    print(f"Expired: [{entry['vault']} / {entry['type']}] {entry['text']}")
+            print(f"Expired {len(expired)} {'entry' if len(expired) == 1 else 'entries'}.")
 
-    elif args.command == "update":
-        clear_expires = args.expires == "none"
-        expires = None if clear_expires else args.expires
-        
-        if update_entry(db_path, args.id, args.text, expires, clear_expires, args.type):
-            print(f"Updated entry {args.id}.")
+    elif args.command == "archive":
+        entry = archive_entry(db_path, args.id)
+        if entry:
+            print(f"Archived [{entry['type']}]: {entry['text']}")
         else:
-            print(f"No entry with id {args.id} or no fields provided to update.")
+            print(f"No active entry with id {args.id}.")
+
+    elif args.command == "archived":
+        entries = list_archived(db_path, args.vault, args.type)
+        if not entries:
+            print(f"No archived entries for vault '{args.vault}'.")
+        else:
+            for entry in entries:
+                print(f"[{entry['type']}] (archived {entry['archived_at']}) {entry['text']}")
+
 
 if __name__ == "__main__":
     main()

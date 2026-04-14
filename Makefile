@@ -1,1 +1,1 @@
-include Makefile.common
+include $(HOME)/projects/py-tooling/Makefile.common

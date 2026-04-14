@@ -1,14 +1,16 @@
 import pytest
 import sqlite3
+
 from vault_log.db import (
     init_db,
     add_entry,
     read_entries,
     search_entries,
     expire_entries,
-    delete_entry,
-    update_entry,
+    archive_entry,
+    list_archived,
 )
+
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
@@ -16,6 +18,9 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setenv("VAULT_LOG_DB", str(db_path))
     init_db(db_path)
     return db_path
+
+
+# --- add / read ---
 
 def test_add_and_read(db):
     add_entry(db, "BrainSync", "decision", "Rule 1", None)
@@ -25,21 +30,30 @@ def test_add_and_read(db):
     assert any(e["text"] == "Rule 1" for e in entries)
     assert any(e["text"] == "State A" for e in entries)
 
+
 def test_read_filters_expired(db):
-    # Manually insert an expired entry since add_entry sets date('now')
     with sqlite3.connect(db) as conn:
         conn.execute(
             "INSERT INTO entries (vault, type, date, expires, text) VALUES (?, ?, ?, ?, ?)",
-            ("BrainSync", "session", "2020-01-01", "2020-01-02", "Old news")
+            ("BrainSync", "session", "2020-01-01", "2020-01-02", "Old news"),
         )
     entries = read_entries(db, "BrainSync")
     assert len(entries) == 0
+
+
+def test_read_excludes_archived(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Stale rule", None)
+    archive_entry(db, row_id)
+    entries = read_entries(db, "BrainSync")
+    assert len(entries) == 0
+
 
 def test_read_no_expiry_always_returned(db):
     add_entry(db, "BrainSync", "decision", "Eternal truth", None)
     entries = read_entries(db, "BrainSync")
     assert len(entries) == 1
     assert entries[0]["text"] == "Eternal truth"
+
 
 def test_read_type_filter(db):
     add_entry(db, "BrainSync", "decision", "Rule 1", None)
@@ -48,36 +62,65 @@ def test_read_type_filter(db):
     assert len(entries) == 1
     assert entries[0]["text"] == "Rule 1"
 
+
+def test_add_returns_id(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Rule 1", None)
+    assert isinstance(row_id, int)
+    assert row_id > 0
+
+
+def test_db_idempotent(db):
+    init_db(db)
+    init_db(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute("SELECT * FROM entries")
+
+
+# --- expire ---
+
 def test_expire_purges_old(db):
     with sqlite3.connect(db) as conn:
         conn.execute(
             "INSERT INTO entries (vault, type, date, expires, text) VALUES (?, ?, ?, ?, ?)",
-            ("BrainSync", "session", "2020-01-01", "2020-01-02", "Old news")
+            ("BrainSync", "session", "2020-01-01", "2020-01-02", "Old news"),
         )
-    count = expire_entries(db)
-    assert count == 1
+    expired = expire_entries(db)
+    assert len(expired) == 1
+    assert expired[0]["text"] == "Old news"
     with sqlite3.connect(db) as conn:
-        res = conn.execute("SELECT COUNT(*) FROM entries").fetchone()
-        assert res[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM entries").fetchone()[0] == 0
+
 
 def test_expire_keeps_future(db):
-    # Future expiry
     add_entry(db, "BrainSync", "session", "Future news", "2099-01-01")
-    count = expire_entries(db)
-    assert count == 0
-    entries = read_entries(db, "BrainSync")
-    assert len(entries) == 1
+    assert expire_entries(db) == []
+    assert len(read_entries(db, "BrainSync")) == 1
+
 
 def test_expire_nothing_to_do(db):
     add_entry(db, "BrainSync", "decision", "Rule 1", None)
-    count = expire_entries(db)
-    assert count == 0
+    assert expire_entries(db) == []
+
+
+def test_expire_returns_entry_details(db):
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO entries (vault, type, date, expires, text) VALUES (?, ?, ?, ?, ?)",
+            ("BrainSync", "session", "2020-01-01", "2020-01-02", "Old news"),
+        )
+    expired = expire_entries(db)
+    assert expired[0]["vault"] == "BrainSync"
+    assert expired[0]["type"] == "session"
+
+
+# --- search ---
 
 def test_search_basic(db):
     add_entry(db, "BrainSync", "decision", "Phase 4 writes via MCP", None)
     results = search_entries(db, "MCP")
     assert len(results) == 1
     assert results[0]["text"] == "Phase 4 writes via MCP"
+
 
 def test_search_vault_filter(db):
     add_entry(db, "VaultA", "decision", "Common keyword", None)
@@ -86,85 +129,88 @@ def test_search_vault_filter(db):
     assert len(results) == 1
     assert results[0]["vault"] == "VaultA"
 
+
 def test_search_no_results(db):
     add_entry(db, "BrainSync", "decision", "Rule 1", None)
-    results = search_entries(db, "Nonexistent")
-    assert len(results) == 0
+    assert search_entries(db, "Nonexistent") == []
 
-def test_add_returns_id(db):
-    row_id = add_entry(db, "BrainSync", "decision", "Rule 1", None)
-    assert isinstance(row_id, int)
-    assert row_id > 0
 
-def test_db_idempotent(db):
-    init_db(db)
-    init_db(db)
-    # No error, and tables still exist
+def test_search_excludes_expired(db):
     with sqlite3.connect(db) as conn:
-        conn.execute("SELECT * FROM entries")
+        conn.execute(
+            "INSERT INTO entries (vault, type, date, expires, text) VALUES (?, ?, ?, ?, ?)",
+            ("BrainSync", "session", "2020-01-01", "2020-01-02", "Old searchable thing"),
+        )
+    assert search_entries(db, "searchable") == []
 
-def test_delete_existing(db):
-    row_id = add_entry(db, "BrainSync", "decision", "Rule 1", None)
-    success = delete_entry(db, row_id)
-    assert success is True
-    entries = read_entries(db, "BrainSync")
-    assert len(entries) == 0
 
-def test_delete_missing(db):
-    success = delete_entry(db, 999)
-    assert success is False
+def test_search_excludes_archived(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Archived searchable rule", None)
+    archive_entry(db, row_id)
+    assert search_entries(db, "Archived") == []
 
-def test_delete_removes_from_fts(db):
-    row_id = add_entry(db, "BrainSync", "decision", "Rule 1", None)
-    delete_entry(db, row_id)
-    results = search_entries(db, "Rule")
-    assert len(results) == 0
 
-def test_update_text(db):
-    row_id = add_entry(db, "BrainSync", "decision", "Old text", None)
-    success = update_entry(db, row_id, text="New text")
-    assert success is True
-    entries = read_entries(db, "BrainSync")
-    assert entries[0]["text"] == "New text"
+# --- archive ---
 
-def test_update_text_rebuilds_fts(db):
-    row_id = add_entry(db, "BrainSync", "decision", "Initial state", None)
-    update_entry(db, row_id, text="Updated state")
-    
-    # New text should be searchable
-    results = search_entries(db, "Updated")
+def test_archive_entry(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Old rule", None)
+    result = archive_entry(db, row_id)
+    assert result is not None
+    assert result["text"] == "Old rule"
+
+
+def test_archive_missing(db):
+    assert archive_entry(db, 999) is None
+
+
+def test_archive_hides_from_read(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Old rule", None)
+    archive_entry(db, row_id)
+    assert read_entries(db, "BrainSync") == []
+
+
+def test_archive_hides_from_search(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Phase 4 MCP rule", None)
+    archive_entry(db, row_id)
+    assert search_entries(db, "MCP") == []
+
+
+def test_archive_already_archived(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Rule", None)
+    archive_entry(db, row_id)
+    assert archive_entry(db, row_id) is None
+
+
+# --- list_archived ---
+
+def test_list_archived_basic(db):
+    row_id = add_entry(db, "BrainSync", "decision", "Old rule", None)
+    archive_entry(db, row_id)
+    results = list_archived(db, "BrainSync")
     assert len(results) == 1
-    
-    # Old text should NOT be searchable
-    results = search_entries(db, "Initial")
-    assert len(results) == 0
+    assert results[0]["text"] == "Old rule"
+    assert results[0]["archived_at"] is not None
 
-def test_update_expires(db):
-    row_id = add_entry(db, "BrainSync", "session", "Note", None)
-    update_entry(db, row_id, expires="2026-01-01")
-    with sqlite3.connect(db) as conn:
-        row = conn.execute("SELECT expires FROM entries WHERE id = ?", (row_id,)).fetchone()
-        assert row[0] == "2026-01-01"
 
-def test_update_clear_expires(db):
-    row_id = add_entry(db, "BrainSync", "session", "Note", "2026-01-01")
-    update_entry(db, row_id, clear_expires=True)
-    with sqlite3.connect(db) as conn:
-        row = conn.execute("SELECT expires FROM entries WHERE id = ?", (row_id,)).fetchone()
-        assert row[0] is None
+def test_list_archived_type_filter(db):
+    r1 = add_entry(db, "BrainSync", "decision", "Old rule", None)
+    r2 = add_entry(db, "BrainSync", "context", "Old context", None)
+    archive_entry(db, r1)
+    archive_entry(db, r2)
+    results = list_archived(db, "BrainSync", type_="decision")
+    assert len(results) == 1
+    assert results[0]["text"] == "Old rule"
 
-def test_update_type(db):
-    row_id = add_entry(db, "BrainSync", "session", "Note", None)
-    update_entry(db, row_id, type_="decision")
-    with sqlite3.connect(db) as conn:
-        row = conn.execute("SELECT type FROM entries WHERE id = ?", (row_id,)).fetchone()
-        assert row[0] == "decision"
 
-def test_update_missing(db):
-    success = update_entry(db, 999, text="Fail")
-    assert success is False
+def test_list_archived_empty(db):
+    add_entry(db, "BrainSync", "decision", "Active rule", None)
+    assert list_archived(db, "BrainSync") == []
 
-def test_update_requires_field(db):
-    row_id = add_entry(db, "BrainSync", "session", "Note", None)
-    success = update_entry(db, row_id)
-    assert success is False
+
+def test_list_archived_excludes_active(db):
+    add_entry(db, "BrainSync", "decision", "Active", None)
+    row_id = add_entry(db, "BrainSync", "decision", "Archived", None)
+    archive_entry(db, row_id)
+    results = list_archived(db, "BrainSync")
+    assert len(results) == 1
+    assert results[0]["text"] == "Archived"
