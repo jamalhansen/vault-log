@@ -1,13 +1,22 @@
 [project]
 name = "vault-log"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.12"
+description = "SQLite-backed session log for Obsidian vaults"
+requires-python = ">=3.11"
 dependencies = []
+
+[project.scripts]
+vlog = "vault_log.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.3",
-    "ruff>=0.15.10",
+    "pytest>=8.0",
+    "ruff>=0.4",
 ]
