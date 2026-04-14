@@ -1,2 +1,3 @@
 [2026-04-14] Initialized project and bootstrapped build system.
 [2026-04-14] Implemented core DB schema, CLI subcommands, and tests. Verified all 22 tests pass.
+[2026-04-14] Completed migration and cleanup. _SESSION_LOG.md deleted and _CONTEXT.md trimmed in BrainSync vault.
