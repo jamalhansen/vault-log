@@ -88,6 +88,14 @@ def read_entries(db_path: Path, vault: str, type_: str | None = None) -> list[di
         return [dict(row) for row in conn.execute(query, params)]
 
 
+def _sanitize_fts_query(query_str: str) -> str:
+    """Quote each whitespace-separated token so FTS5's query syntax (column
+    filters, NOT via leading '-', etc.) can't misparse raw user input like
+    "session-orient". Tokens match literally; multiple tokens AND together."""
+    tokens = query_str.split()
+    return " ".join('"' + token.replace('"', '""') + '"' for token in tokens)
+
+
 def search_entries(db_path: Path, query_str: str, vault: str | None = None) -> list[dict]:
     """FTS5 MATCH search. Excludes expired and archived entries. Optionally scoped to a vault."""
     sql = """
@@ -98,7 +106,7 @@ def search_entries(db_path: Path, query_str: str, vault: str | None = None) -> l
           AND e.archived_at IS NULL
           AND (e.expires IS NULL OR e.expires >= date('now'))
     """
-    params = [query_str]
+    params = [_sanitize_fts_query(query_str)]
     if vault:
         sql += " AND e.vault = ?"
         params.append(vault)
