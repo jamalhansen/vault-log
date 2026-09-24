@@ -2,8 +2,10 @@
 name = "vault-log"
 version = "0.1.0"
 description = "SQLite-backed session log for Obsidian vaults"
-requires-python = ">=3.11"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+    "local-first-common>=0.1.0",
+]
 
 [project.scripts]
 vlog = "vault_log.cli:main"
@@ -11,6 +13,9 @@ vlog = "vault_log.cli:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.uv.sources]
+local-first-common = { git = "https://github.com/jamalhansen/local-first-common.git", branch = "main" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -2,6 +2,8 @@ import argparse
 import sys
 from datetime import datetime, timedelta
 
+from local_first_common.tracking import timed_run
+
 from vault_log.db import (
     resolve_db_path,
     init_db,
@@ -69,6 +71,14 @@ def main():
     db_path = resolve_db_path()
     init_db(db_path)
 
+    # No LLM model involved (model=None); this just gives vlog a heartbeat on
+    # the fleet dashboard's activity panel, which vault_log was invisible to.
+    with timed_run("vault-log", None, source_location=getattr(args, "vault", None)) as run:
+        run.item_count = _dispatch(args, db_path)
+
+
+def _dispatch(args, db_path) -> int:
+    """Run the parsed command; returns an item count for tracking."""
     if args.command == "add":
         if args.type == "session" and not args.expires:
             print(
@@ -86,6 +96,7 @@ def main():
 
         row_id = add_entry(db_path, args.vault, args.type, args.text, expires)
         print(f"Added [{args.type}] to {args.vault} (id={row_id})")
+        return 1
 
     elif args.command == "read":
         entries = read_entries(db_path, args.vault, args.type)
@@ -94,6 +105,7 @@ def main():
         else:
             for entry in entries:
                 print(f"[{entry['type']}] {entry['text']}")
+        return len(entries)
 
     elif args.command == "search":
         results = search_entries(db_path, args.query, args.vault)
@@ -102,6 +114,7 @@ def main():
         else:
             for res in results:
                 print(f"[{res['vault']} / {res['type']}] {res['text']}")
+        return len(results)
 
     elif args.command == "expire":
         expired = expire_entries(db_path)
@@ -112,6 +125,7 @@ def main():
                 for entry in expired:
                     print(f"Expired: [{entry['vault']} / {entry['type']}] {entry['text']}")
             print(f"Expired {len(expired)} {'entry' if len(expired) == 1 else 'entries'}.")
+        return len(expired)
 
     elif args.command == "archive":
         entry = archive_entry(db_path, args.id)
@@ -119,6 +133,7 @@ def main():
             print(f"Archived [{entry['type']}]: {entry['text']}")
         else:
             print(f"No active entry with id {args.id}.")
+        return 1 if entry else 0
 
     elif args.command == "archived":
         entries = list_archived(db_path, args.vault, args.type)
@@ -127,6 +142,9 @@ def main():
         else:
             for entry in entries:
                 print(f"[{entry['type']}] (archived {entry['archived_at']}) {entry['text']}")
+        return len(entries)
+
+    return 0
 
 
 if __name__ == "__main__":
