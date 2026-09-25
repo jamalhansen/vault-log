@@ -4,11 +4,13 @@ version = "0.1.0"
 description = "SQLite-backed session log for Obsidian vaults"
 requires-python = ">=3.12"
 dependencies = [
+    "typer>=0.15.0",
+    "click<8.3.2",  # 8.3.2 breaks typer 0.24.1 option parsing (same pin as the rest of the fleet)
     "local-first-common>=0.1.0",
 ]
 
 [project.scripts]
-vlog = "vault_log.cli:main"
+vlog = "vault_log.cli:app"
 
 [build-system]
 requires = ["hatchling"]

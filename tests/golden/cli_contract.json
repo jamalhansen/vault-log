@@ -1,0 +1,261 @@
+[
+  {
+    "argv": [
+      "add",
+      "--vault",
+      "Contexta",
+      "--type",
+      "context",
+      "hello world"
+    ],
+    "exit": 0,
+    "stdout": "Added [context] to Contexta (id=1)\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "add",
+      "-w",
+      "Contexta",
+      "-t",
+      "session",
+      "a session note"
+    ],
+    "exit": 0,
+    "stdout": "Added [session] to Contexta (id=2)\n",
+    "stderr": "Warning: session entry without expiry. Consider adding -e YYYY-MM-DD or -e +14d.\n"
+  },
+  {
+    "argv": [
+      "add",
+      "-w",
+      "Contexta",
+      "-t",
+      "session",
+      "-e",
+      "+14d",
+      "expires later"
+    ],
+    "exit": 0,
+    "stdout": "Added [session] to Contexta (id=3)\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "add",
+      "-w",
+      "Contexta",
+      "-t",
+      "decision",
+      "-e",
+      "2020-01-01",
+      "already expired"
+    ],
+    "exit": 0,
+    "stdout": "Added [decision] to Contexta (id=4)\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "add",
+      "-w",
+      "KeySix",
+      "-t",
+      "decision",
+      "-v",
+      "other vault"
+    ],
+    "exit": 0,
+    "stdout": "Added [decision] to KeySix (id=5)\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "add",
+      "-w",
+      "Contexta",
+      "-t",
+      "decision",
+      "-e",
+      "not-a-date",
+      "bad expiry"
+    ],
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Error: Invalid date 'not-a-date'. Use YYYY-MM-DD or +14d format.\n"
+  },
+  {
+    "argv": [
+      "add",
+      "-w",
+      "Contexta",
+      "-t",
+      "bogus",
+      "bad type"
+    ],
+    "exit": 2,
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "add",
+      "-w",
+      "Contexta",
+      "-t",
+      "context"
+    ],
+    "exit": 2,
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "read",
+      "--vault",
+      "Contexta"
+    ],
+    "exit": 0,
+    "stdout": "[context] hello world\n[session] a session note\n[session] expires later\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "read",
+      "-w",
+      "Contexta",
+      "-t",
+      "session"
+    ],
+    "exit": 0,
+    "stdout": "[session] a session note\n[session] expires later\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "read",
+      "-w",
+      "Nowhere"
+    ],
+    "exit": 0,
+    "stdout": "No entries for vault 'Nowhere'.\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "search",
+      "hello"
+    ],
+    "exit": 0,
+    "stdout": "[Contexta / context] hello world\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "search",
+      "note",
+      "-w",
+      "Contexta"
+    ],
+    "exit": 0,
+    "stdout": "[Contexta / session] a session note\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "search",
+      "zzzqqq"
+    ],
+    "exit": 0,
+    "stdout": "No results for 'zzzqqq'.\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "archive",
+      "--id",
+      "1"
+    ],
+    "exit": 0,
+    "stdout": "Archived [context]: hello world\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "archive",
+      "-i",
+      "99"
+    ],
+    "exit": 0,
+    "stdout": "No active entry with id 99.\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "archive",
+      "-i",
+      "not-a-number"
+    ],
+    "exit": 2,
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "archived",
+      "-w",
+      "Contexta"
+    ],
+    "exit": 0,
+    "stdout": "[context] (archived <DATE>) hello world\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "archived",
+      "-w",
+      "Contexta",
+      "-t",
+      "decision"
+    ],
+    "exit": 0,
+    "stdout": "No archived entries for vault 'Contexta'.\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "expire",
+      "-v"
+    ],
+    "exit": 0,
+    "stdout": "Expired: [Contexta / decision] already expired\nExpired 1 entry.\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "expire"
+    ],
+    "exit": 0,
+    "stdout": "Nothing to expire.\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "read",
+      "-w",
+      "Contexta"
+    ],
+    "exit": 0,
+    "stdout": "[session] a session note\n[session] expires later\n",
+    "stderr": ""
+  },
+  {
+    "argv": [],
+    "exit": 2,
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "nonsense"
+    ],
+    "exit": 2,
+    "stdout": ""
+  }
+]

@@ -1,16 +1,17 @@
 import os
-import sys
 
 import duckdb
+from typer.testing import CliRunner
 
-from vault_log.cli import main
+from vault_log.cli import app
+
+runner = CliRunner()
 
 
 def _run(monkeypatch, tmp_path, argv):
-    db_path = tmp_path / "test.db"
-    monkeypatch.setenv("VAULT_LOG_DB", str(db_path))
-    monkeypatch.setattr(sys, "argv", ["vlog", *argv])
-    main()
+    monkeypatch.setenv("VAULT_LOG_DB", str(tmp_path / "test.db"))
+    result = runner.invoke(app, argv)
+    assert result.exit_code == 0, result.output
 
 
 def _tracking_db():
