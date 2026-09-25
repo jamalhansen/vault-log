@@ -1,14 +1,15 @@
-import pytest
 import sqlite3
 
+import pytest
+
 from vault_log.db import (
-    init_db,
     add_entry,
+    archive_entry,
+    expire_entries,
+    init_db,
+    list_archived,
     read_entries,
     search_entries,
-    expire_entries,
-    archive_entry,
-    list_archived,
 )
 
 

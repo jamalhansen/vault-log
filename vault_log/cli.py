@@ -5,14 +5,14 @@ from datetime import datetime, timedelta
 from local_first_common.tracking import timed_run
 
 from vault_log.db import (
-    resolve_db_path,
-    init_db,
     add_entry,
-    read_entries,
-    search_entries,
-    expire_entries,
     archive_entry,
+    expire_entries,
+    init_db,
     list_archived,
+    read_entries,
+    resolve_db_path,
+    search_entries,
 )
 
 
@@ -23,10 +23,10 @@ def _parse_expires(value: str) -> str:
             days = int(value[1:-1])
         except ValueError:
             raise ValueError(f"Invalid relative date '{value}'. Use +14d format.")
-        return (datetime.now() + timedelta(days=days)).date().isoformat()
+        return (datetime.now().astimezone() + timedelta(days=days)).date().isoformat()
     # Validate it looks like an ISO date
     try:
-        datetime.strptime(value, "%Y-%m-%d")
+        datetime.strptime(value, "%Y-%m-%d")  # noqa: DTZ007 - format validation only; the value is kept as a date string
     except ValueError:
         raise ValueError(f"Invalid date '{value}'. Use YYYY-MM-DD or +14d format.")
     return value
