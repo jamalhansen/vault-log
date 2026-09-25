@@ -2,7 +2,7 @@ import argparse
 import sys
 from datetime import datetime, timedelta
 
-from local_first_common.tracking import timed_run
+from local_first_common.tracking import register_tool, timed_run
 
 from vault_log.db import (
     add_entry,
@@ -14,6 +14,8 @@ from vault_log.db import (
     resolve_db_path,
     search_entries,
 )
+
+_TOOL = register_tool("vault-log")
 
 
 def _parse_expires(value: str) -> str:
