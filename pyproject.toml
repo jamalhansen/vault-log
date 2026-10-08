@@ -4,8 +4,7 @@ version = "0.1.0"
 description = "SQLite-backed session log for Obsidian vaults"
 requires-python = ">=3.12"
 dependencies = [
-    "typer>=0.15.0",
-    "click<8.3.2",  # 8.3.2 breaks typer 0.24.1 option parsing (same pin as the rest of the fleet)
+    "typer>=0.27.2",  # the fleet's typer; 0.27 dropped the click dependency, so the old click<8.3.2 pin went with it
     "local-first-common>=0.1.0",
 ]
 

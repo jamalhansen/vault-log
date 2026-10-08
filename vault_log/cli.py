@@ -26,13 +26,17 @@ def _parse_expires(value: str) -> str:
         try:
             days = int(value[1:-1])
         except ValueError:
-            raise ValueError(f"Invalid relative date '{value}'. Use +14d format.")
+            raise ValueError(
+                f"Invalid relative date '{value}'. Use +14d format."
+            ) from None
         return (datetime.now().astimezone() + timedelta(days=days)).date().isoformat()
     # Validate it looks like an ISO date
     try:
         datetime.strptime(value, "%Y-%m-%d")  # noqa: DTZ007 - format validation only; the value is kept as a date string
     except ValueError:
-        raise ValueError(f"Invalid date '{value}'. Use YYYY-MM-DD or +14d format.")
+        raise ValueError(
+            f"Invalid date '{value}'. Use YYYY-MM-DD or +14d format."
+        ) from None
     return value
 
 
@@ -42,7 +46,9 @@ class EntryType(str, Enum):
     decision = "decision"
 
 
-app = typer.Typer(help="SQLite-backed session log for Obsidian vaults", add_completion=False)
+app = typer.Typer(
+    help="SQLite-backed session log for Obsidian vaults", add_completion=False
+)
 VaultRequired = Annotated[str, typer.Option("--vault", "-w")]
 
 
@@ -65,10 +71,16 @@ def add(
     text: Annotated[str, typer.Argument()],
     vault: VaultRequired,
     entry_type: Annotated[EntryType, typer.Option("--type", "-t")],
-    expires: Annotated[str | None, typer.Option("--expires", "-e", help="ISO date (YYYY-MM-DD) or relative (+14d)")] = None,
+    expires: Annotated[
+        str | None,
+        typer.Option(
+            "--expires", "-e", help="ISO date (YYYY-MM-DD) or relative (+14d)"
+        ),
+    ] = None,
     verbose: Annotated[bool, typer.Option("-v", "--verbose")] = False,
 ) -> None:
     """Add an entry."""
+
     def command(db_path) -> int:
         if entry_type == EntryType.session and not expires:
             print(
@@ -95,6 +107,7 @@ def read(
     entry_type: Annotated[EntryType | None, typer.Option("--type", "-t")] = None,
 ) -> None:
     """Read active entries for a vault."""
+
     def command(db_path) -> int:
         entries = read_entries(db_path, vault, entry_type.value if entry_type else None)
         if not entries:
@@ -112,6 +125,7 @@ def search(
     vault: Annotated[str | None, typer.Option("--vault", "-w")] = None,
 ) -> None:
     """Search entry text."""
+
     def command(db_path) -> int:
         results = search_entries(db_path, query, vault)
         if not results:
@@ -126,6 +140,7 @@ def search(
 @app.command()
 def expire(verbose: Annotated[bool, typer.Option("-v", "--verbose")] = False) -> None:
     """Hide entries whose expiry date has passed."""
+
     def command(db_path) -> int:
         expired = expire_entries(db_path)
         if not expired:
@@ -143,6 +158,7 @@ def expire(verbose: Annotated[bool, typer.Option("-v", "--verbose")] = False) ->
 @app.command()
 def archive(entry_id: Annotated[int, typer.Option("--id", "-i")]) -> None:
     """Archive one active entry by id."""
+
     def command(db_path) -> int:
         entry = archive_entry(db_path, entry_id)
         if entry:
@@ -160,12 +176,17 @@ def archived(
     entry_type: Annotated[EntryType | None, typer.Option("--type", "-t")] = None,
 ) -> None:
     """List archived entries for a vault."""
+
     def command(db_path) -> int:
-        entries = list_archived(db_path, vault, entry_type.value if entry_type else None)
+        entries = list_archived(
+            db_path, vault, entry_type.value if entry_type else None
+        )
         if not entries:
             print(f"No archived entries for vault '{vault}'.")
         for entry in entries:
-            print(f"[{entry['type']}] (archived {entry['archived_at']}) {entry['text']}")
+            print(
+                f"[{entry['type']}] (archived {entry['archived_at']}) {entry['text']}"
+            )
         return len(entries)
 
     _run(vault, command)

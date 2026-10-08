@@ -58,7 +58,9 @@ def init_db(db_path: Path) -> None:
         """)
 
 
-def add_entry(db_path: Path, vault: str, type_: str, text: str, expires: str | None) -> int:
+def add_entry(
+    db_path: Path, vault: str, type_: str, text: str, expires: str | None
+) -> int:
     """Insert entry. Returns new row id."""
     with sqlite3.connect(db_path) as conn:
         cursor = conn.execute(
@@ -96,7 +98,9 @@ def _sanitize_fts_query(query_str: str) -> str:
     return " ".join('"' + token.replace('"', '""') + '"' for token in tokens)
 
 
-def search_entries(db_path: Path, query_str: str, vault: str | None = None) -> list[dict]:
+def search_entries(
+    db_path: Path, query_str: str, vault: str | None = None
+) -> list[dict]:
     """FTS5 MATCH search. Excludes expired and archived entries. Optionally scoped to a vault."""
     sql = """
         SELECT e.id, e.vault, e.type, e.date, e.expires, e.text
@@ -141,7 +145,9 @@ def archive_entry(db_path: Path, id_: int) -> dict | None:
         ).fetchone()
         if not row:
             return None
-        conn.execute("UPDATE entries SET archived_at = date('now') WHERE id = ?", (id_,))
+        conn.execute(
+            "UPDATE entries SET archived_at = date('now') WHERE id = ?", (id_,)
+        )
         return dict(row)
 
 

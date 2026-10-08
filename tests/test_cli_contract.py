@@ -4,6 +4,7 @@ The Contexta session hook runs `vlog read --vault Contexta`, and CLAUDE.md docum
 other commands, so a change of CLI framework must not change them. Runs the installed
 script against a temporary database. Re-record deliberately with RECORD_CLI_CONTRACT=1.
 """
+
 import json
 import os
 import re
@@ -45,17 +46,30 @@ SEQUENCE = [
 
 
 def _normalize(text: str) -> str:
-    return re.sub(r"\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?", "<DATE>", text)
+    return re.sub(
+        r"\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?)?", "<DATE>", text
+    )
 
 
 def _results(tmp_path: Path) -> list[dict]:
-    env = {**os.environ, "VAULT_LOG_DB": str(tmp_path / "vlog.db"),
-           "LOCAL_FIRST_TRACKING_DB": str(tmp_path / "tracking.duckdb")}
+    env = {
+        **os.environ,
+        "VAULT_LOG_DB": str(tmp_path / "vlog.db"),
+        "LOCAL_FIRST_TRACKING_DB": str(tmp_path / "tracking.duckdb"),
+    }
     out = []
     for argv in SEQUENCE:
-        proc = subprocess.run([str(VLOG), *argv], capture_output=True, text=True, env=env, check=False)
-        result = {"argv": argv, "exit": proc.returncode, "stdout": _normalize(proc.stdout)}
-        if proc.returncode != 2:  # usage errors: only the exit code is part of the contract
+        proc = subprocess.run(
+            [str(VLOG), *argv], capture_output=True, text=True, env=env, check=False
+        )
+        result = {
+            "argv": argv,
+            "exit": proc.returncode,
+            "stdout": _normalize(proc.stdout),
+        }
+        if (
+            proc.returncode != 2
+        ):  # usage errors: only the exit code is part of the contract
             result["stderr"] = _normalize(proc.stderr)
         out.append(result)
     return out

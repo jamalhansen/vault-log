@@ -155,8 +155,12 @@ def init_db(db_path: Path) -> None:
     ~/sync/ may not exist on a fresh machine and must not be assumed present.
     """
 
-def add_entry(db_path: Path, vault: str, type_: str, text: str, expires: str | None) -> int:
+
+def add_entry(
+    db_path: Path, vault: str, type_: str, text: str, expires: str | None
+) -> int:
     """Insert entry. Returns new row id."""
+
 
 def read_entries(db_path: Path, vault: str, type_: str | None = None) -> list[dict]:
     """Return non-expired entries for vault. Filters by type if given.
@@ -164,14 +168,18 @@ def read_entries(db_path: Path, vault: str, type_: str | None = None) -> list[di
     ORDER BY type, date DESC
     """
 
+
 def search_entries(db_path: Path, query: str, vault: str | None = None) -> list[dict]:
     """FTS5 MATCH search. Optionally scoped to a vault."""
+
 
 def expire_entries(db_path: Path) -> int:
     """DELETE where expires < date('now'). Returns count of deleted rows."""
 
+
 def delete_entry(db_path: Path, id_: int) -> bool:
     """Delete a single entry by id. Returns True if a row was deleted, False if not found."""
+
 
 def update_entry(
     db_path: Path,

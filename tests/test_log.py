@@ -23,6 +23,7 @@ def db(tmp_path, monkeypatch):
 
 # --- add / read ---
 
+
 def test_add_and_read(db):
     add_entry(db, "BrainSync", "decision", "Rule 1", None)
     add_entry(db, "BrainSync", "context", "State A", None)
@@ -79,6 +80,7 @@ def test_db_idempotent(db):
 
 # --- expire ---
 
+
 def test_expire_purges_old(db):
     with sqlite3.connect(db) as conn:
         conn.execute(
@@ -116,6 +118,7 @@ def test_expire_returns_entry_details(db):
 
 # --- search ---
 
+
 def test_search_basic(db):
     add_entry(db, "BrainSync", "decision", "Phase 4 writes via MCP", None)
     results = search_entries(db, "MCP")
@@ -140,7 +143,13 @@ def test_search_excludes_expired(db):
     with sqlite3.connect(db) as conn:
         conn.execute(
             "INSERT INTO entries (vault, type, date, expires, text) VALUES (?, ?, ?, ?, ?)",
-            ("BrainSync", "session", "2020-01-01", "2020-01-02", "Old searchable thing"),
+            (
+                "BrainSync",
+                "session",
+                "2020-01-01",
+                "2020-01-02",
+                "Old searchable thing",
+            ),
         )
     assert search_entries(db, "searchable") == []
 
@@ -152,6 +161,7 @@ def test_search_excludes_archived(db):
 
 
 # --- archive ---
+
 
 def test_archive_entry(db):
     row_id = add_entry(db, "BrainSync", "decision", "Old rule", None)
@@ -183,6 +193,7 @@ def test_archive_already_archived(db):
 
 
 # --- list_archived ---
+
 
 def test_list_archived_basic(db):
     row_id = add_entry(db, "BrainSync", "decision", "Old rule", None)
